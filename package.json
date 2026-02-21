@@ -1,6 +1,6 @@
 {
-  "name": "ollama-copilot",
-  "displayName": "Ollama Copilot",
+  "name": "ollama-ai-copilot",
+  "displayName": "Ollama AI Copilot",
   "description": "Agentic AI coding assistant powered by local Ollama models with multi-mode support",
   "version": "1.1.0",
   "publisher": "anandof28",
