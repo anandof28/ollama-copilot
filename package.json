@@ -1,0 +1,139 @@
+{
+  "name": "ollama-copilot",
+  "displayName": "Ollama Copilot",
+  "description": "Agentic AI coding assistant powered by local Ollama models with multi-mode support",
+  "version": "1.1.0",
+  "publisher": "anandof28",
+  "author": {
+    "name": "Anand"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anandof28/ollama-copilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/anandof28/ollama-copilot/issues"
+  },
+  "homepage": "https://github.com/anandof28/ollama-copilot#readme",
+  "keywords": [
+    "ai",
+    "ollama",
+    "copilot",
+    "coding-assistant",
+    "code-generation",
+    "llm",
+    "local-ai",
+    "agentic",
+    "multi-agent",
+    "code-review",
+    "refactoring"
+  ],
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "AI",
+    "Snippets"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ollama-copilot.openPanel",
+        "title": "Open Ollama Copilot",
+        "category": "Ollama Copilot"
+      },
+      {
+        "command": "ollama-copilot.implementFeature",
+        "title": "Implement Feature",
+        "category": "Ollama Copilot"
+      },
+      {
+        "command": "ollama-copilot.selectModel",
+        "title": "Select Model",
+        "category": "Ollama Copilot"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ollama-copilot",
+          "title": "Ollama Copilot",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ollama-copilot": [
+        {
+          "type": "webview",
+          "id": "ollama-copilot.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Ollama Copilot",
+      "properties": {
+        "ollamaCopilot.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama API base URL"
+        },
+        "ollamaCopilot.model": {
+          "type": "string",
+          "default": "qwen2.5-coder:7b",
+          "description": "Ollama model to use for code generation"
+        },
+        "ollamaCopilot.temperature": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Temperature for model responses (0 = deterministic, 2 = very creative)"
+        },
+        "ollamaCopilot.maxTokens": {
+          "type": "number",
+          "default": 4000,
+          "minimum": 100,
+          "maximum": 32000,
+          "description": "Maximum number of tokens to generate"
+        },
+        "ollamaCopilot.allowedCommands": {
+          "type": "array",
+          "default": [
+            "npm test",
+            "npm run build",
+            "npm run lint",
+            "pnpm test",
+            "pytest"
+          ],
+          "description": "Allowed terminal commands for security"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.75.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/vsce": "^3.7.1",
+    "eslint": "^10.0.0",
+    "typescript": "^5.0.0"
+  }
+}
