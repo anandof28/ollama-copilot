@@ -363,6 +363,119 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       font-size: 12px;
     }
 
+    .code-block {
+      margin: 8px 0;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+      background-color: var(--vscode-textCodeBlock-background);
+    }
+
+    .code-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      font-size: 11px;
+      opacity: 0.85;
+    }
+
+    .code-language {
+      text-transform: lowercase;
+    }
+
+    .copy-code-btn {
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--vscode-panel-border);
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .copy-code-btn:hover {
+      background-color: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    .message-content p {
+      margin: 0;
+    }
+
+    .message-content p + p {
+      margin-top: 8px;
+    }
+
+    .message-content h1,
+    .message-content h2,
+    .message-content h3,
+    .message-content h4,
+    .message-content h5,
+    .message-content h6 {
+      margin: 10px 0 6px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .message-content h1 { font-size: 18px; }
+    .message-content h2 { font-size: 16px; }
+    .message-content h3 { font-size: 14px; }
+
+    .message-content ul,
+    .message-content ol {
+      margin: 6px 0 6px 20px;
+      padding: 0;
+    }
+
+    .message-content li {
+      margin: 2px 0;
+    }
+
+    .message-content blockquote {
+      margin: 8px 0;
+      padding: 6px 10px;
+      border-left: 3px solid var(--vscode-textLink-foreground);
+      background-color: var(--vscode-editor-background);
+      opacity: 0.95;
+    }
+
+    .message-content hr {
+      border: none;
+      border-top: 1px solid var(--vscode-panel-border);
+      margin: 10px 0;
+    }
+
+    .message-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0;
+      font-size: 12px;
+    }
+
+    .message-content th,
+    .message-content td {
+      border: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .message-content th {
+      background-color: var(--vscode-editor-background);
+      font-weight: 600;
+    }
+
     .progress {
       padding: 8px 12px;
       background-color: var(--vscode-inputValidation-infoBackground);
@@ -608,6 +721,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     sendButton.addEventListener('click', sendMessage);
+
+    chatContainer.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (!target.classList.contains('copy-code-btn')) {
+        return;
+      }
+
+      const encodedCode = target.getAttribute('data-code') || '';
+      let code = '';
+      try {
+        code = decodeURIComponent(encodedCode);
+      } catch {
+        code = '';
+      }
+
+      try {
+        await navigator.clipboard.writeText(code);
+        const originalLabel = target.textContent;
+        target.textContent = 'Copied';
+        setTimeout(() => {
+          target.textContent = originalLabel || 'Copy';
+        }, 1200);
+      } catch {
+        target.textContent = 'Failed';
+        setTimeout(() => {
+          target.textContent = 'Copy';
+        }, 1200);
+      }
+    });
     
     // Stop button
     stopButton.addEventListener('click', () => {
@@ -697,7 +843,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           <span>\${labels[type] || type}</span>
           <span style="margin-left: auto; font-size: 10px;">\${formatTime(timestamp)}</span>
         </div>
-        <div class="message-content">\${escapeHtml(content)}</div>
+        <div class="message-content">\${renderMessageContent(content)}</div>
       \`;
 
       chatContainer.appendChild(messageDiv);
@@ -794,6 +940,134 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    function renderMessageContent(content) {
+      if (!content) {
+        return '';
+      }
+
+      const parts = [];
+      const backtick = String.fromCharCode(96);
+      const fence = backtick + backtick + backtick;
+      const codeBlockPattern = fence + '([a-zA-Z0-9_+#.-]*)\\n?([\\s\\S]*?)' + fence;
+      const codeBlockRegex = new RegExp(codeBlockPattern, 'g');
+      let lastIndex = 0;
+      let match;
+
+      while ((match = codeBlockRegex.exec(content)) !== null) {
+        const plainText = content.slice(lastIndex, match.index);
+        if (plainText) {
+          parts.push(renderRichText(plainText));
+        }
+
+        const language = (match[1] || 'code').trim();
+        const rawCode = match[2] || '';
+        const displayCode = rawCode.replace(/\n$/, '');
+        const encodedCode = encodeURIComponent(displayCode);
+
+        parts.push(
+          '<div class="code-block">' +
+            '<div class="code-block-header">' +
+              '<span class="code-language">' + escapeHtml(language) + '</span>' +
+              '<button class="copy-code-btn" data-code="' + encodedCode + '">Copy</button>' +
+            '</div>' +
+            '<pre><code>' + escapeHtml(displayCode) + '</code></pre>' +
+          '</div>'
+        );
+
+        lastIndex = codeBlockRegex.lastIndex;
+      }
+
+      const remainingText = content.slice(lastIndex);
+      if (remainingText) {
+        parts.push(renderRichText(remainingText));
+      }
+
+      return parts.join('');
+    }
+
+    function renderInline(text) {
+      const escaped = escapeHtml(text);
+      const backtick = String.fromCharCode(96);
+      const inlineCodePattern = backtick + '([^' + backtick + ']+)' + backtick;
+      const inlineCodeRegex = new RegExp(inlineCodePattern, 'g');
+      const withInlineCode = escaped.replace(inlineCodeRegex, '<code>$1</code>');
+      const withBold = withInlineCode.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      const withItalic = withBold.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+      return withItalic;
+    }
+
+    function renderRichText(text) {
+      const normalized = (text || '').replace(/\r\n/g, '\n').trim();
+      if (!normalized) {
+        return '';
+      }
+
+      const blocks = normalized.split(/\n{2,}/);
+      return blocks.map(renderBlock).join('');
+    }
+
+    function renderBlock(block) {
+      const lines = block.split('\n');
+      const firstLine = lines[0].trim();
+
+      if (/^#{1,6}\s+/.test(firstLine) && lines.length === 1) {
+        const level = Math.min((firstLine.match(/^#+/) || ['#'])[0].length, 6);
+        const content = firstLine.replace(/^#{1,6}\s+/, '');
+        return '<h' + level + '>' + renderInline(content) + '</h' + level + '>';
+      }
+
+      if (lines.every(line => /^\s*>/.test(line.trim()))) {
+        const quoteText = lines.map(line => line.replace(/^\s*>\s?/, '')).join('<br>');
+        return '<blockquote>' + renderInline(quoteText) + '</blockquote>';
+      }
+
+      if (firstLine.match(/^(-{3,}|\*{3,}|_{3,})$/) && lines.length === 1) {
+        return '<hr>';
+      }
+
+      if (isTable(lines)) {
+        return renderTable(lines);
+      }
+
+      if (lines.every(line => /^\s*[-*+]\s+/.test(line))) {
+        return '<ul>' + lines.map(line => '<li>' + renderInline(line.replace(/^\s*[-*+]\s+/, '')) + '</li>').join('') + '</ul>';
+      }
+
+      if (lines.every(line => /^\s*\d+\.\s+/.test(line))) {
+        return '<ol>' + lines.map(line => '<li>' + renderInline(line.replace(/^\s*\d+\.\s+/, '')) + '</li>').join('') + '</ol>';
+      }
+
+      return '<p>' + renderInline(block).replace(/\n/g, '<br>') + '</p>';
+    }
+
+    function isTable(lines) {
+      if (lines.length < 2) {
+        return false;
+      }
+
+      const hasPipes = lines.every(line => line.includes('|'));
+      if (!hasPipes) {
+        return false;
+      }
+
+      return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(lines[1]);
+    }
+
+    function renderTable(lines) {
+      const parseRow = (line) => line
+        .split('|')
+        .map(cell => cell.trim())
+        .filter((_, index, arr) => !(index === 0 && arr[index] === '') && !(index === arr.length - 1 && arr[index] === ''));
+
+      const headers = parseRow(lines[0]);
+      const bodyRows = lines.slice(2).map(parseRow);
+
+      const headerHtml = '<tr>' + headers.map(cell => '<th>' + renderInline(cell) + '</th>').join('') + '</tr>';
+      const bodyHtml = bodyRows.map(row => '<tr>' + row.map(cell => '<td>' + renderInline(cell) + '</td>').join('') + '</tr>').join('');
+
+      return '<table><thead>' + headerHtml + '</thead><tbody>' + bodyHtml + '</tbody></table>';
     }
 
     // Request initial models

@@ -7,6 +7,7 @@ import { CoderOutput, OllamaMessage, PlannerOutput, FileContext } from '../proto
 import { CODER_SYSTEM_PROMPT, buildCoderPrompt } from '../protocol/prompts';
 import { WorkspaceTool } from '../tools/workspace';
 import { SearchTool } from '../tools/search';
+import { parseJsonObject } from './jsonParser';
 
 export class CoderAgent {
   private ollama: OllamaClient;
@@ -49,7 +50,7 @@ export class CoderAgent {
       });
 
       // Parse JSON response
-      let coderOutput = this.parseJSON<CoderOutput>(response);
+      let coderOutput = parseJsonObject<CoderOutput>(response);
 
       if (!coderOutput) {
         onProgress?.('Retrying JSON parsing...');
@@ -61,7 +62,7 @@ export class CoderAgent {
         });
 
         response = await this.ollama.chat(messages);
-        coderOutput = this.parseJSON<CoderOutput>(response);
+        coderOutput = parseJsonObject<CoderOutput>(response);
       }
 
       if (!coderOutput) {
@@ -138,34 +139,6 @@ export class CoderAgent {
 
     return context;
   }
-
-  /**
-   * Parse JSON from response
-   */
-  private parseJSON<T>(text: string): T | null {
-    try {
-      let cleaned = text.trim();
-      
-      // Remove markdown code blocks
-      cleaned = cleaned.replace(/^```json\s*/i, '');
-      cleaned = cleaned.replace(/^```\s*/, '');
-      cleaned = cleaned.replace(/\s*```$/, '');
-      
-      // Find JSON object
-      const jsonStart = cleaned.indexOf('{');
-      const jsonEnd = cleaned.lastIndexOf('}');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-      }
-
-      return JSON.parse(cleaned) as T;
-    } catch (error) {
-      console.error('JSON parse error:', error);
-      return null;
-    }
-  }
-
   /**
    * Validate coder output structure
    */
