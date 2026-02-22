@@ -7,6 +7,8 @@ import { TestFix, OllamaMessage, FileContext, Patch } from '../protocol/types';
 import { TESTER_SYSTEM_PROMPT, buildTesterPrompt } from '../protocol/prompts';
 import { TerminalTool } from '../tools/terminal';
 import { WorkspaceTool } from '../tools/workspace';
+import * as path from 'path';
+import { parseJsonObject } from './jsonParser';
 
 export class TesterAgent {
   private ollama: OllamaClient;
@@ -109,7 +111,7 @@ export class TesterAgent {
       });
 
       // Parse JSON
-      let fix = this.parseJSON<TestFix>(response);
+      let fix = parseJsonObject<TestFix>(response);
 
       if (!fix) {
         onProgress?.('Retrying JSON parsing...');
@@ -121,11 +123,15 @@ export class TesterAgent {
         });
 
         response = await this.ollama.chat(messages);
-        fix = this.parseJSON<TestFix>(response);
+        fix = parseJsonObject<TestFix>(response);
       }
 
       if (!fix) {
         throw new Error('Failed to get valid fix from tester');
+      }
+
+      if (!this.isValidTestFix(fix)) {
+        throw new Error('Invalid test fix structure');
       }
 
       onProgress?.('Fix generated!');
@@ -141,19 +147,23 @@ export class TesterAgent {
    */
   private extractAffectedFiles(output: string): string[] {
     const files = new Set<string>();
+    const workspaceRoot = this.workspace.getWorkspaceRoot();
     
     // Common patterns for file paths in error messages
     const patterns = [
       /at\s+.*?\(([^)]+\.(?:ts|js|tsx|jsx)):(\d+):\d+\)/g,
-      /([^/\s]+\.(?:ts|js|tsx|jsx)):(\d+):\d+/g,
-      /Error in ([^/\s]+\.(?:ts|js|tsx|jsx))/g
+      /([A-Za-z0-9_./\\-]+\.(?:ts|js|tsx|jsx)):(\d+):\d+/g,
+      /Error in ([A-Za-z0-9_./\\-]+\.(?:ts|js|tsx|jsx))/g
     ];
 
     for (const pattern of patterns) {
       const matches = output.matchAll(pattern);
       for (const match of matches) {
         if (match[1]) {
-          files.add(match[1]);
+          const normalizedPath = this.normalizeExtractedPath(match[1], workspaceRoot);
+          if (normalizedPath) {
+            files.add(normalizedPath);
+          }
         }
       }
     }
@@ -162,29 +172,35 @@ export class TesterAgent {
   }
 
   /**
-   * Parse JSON from response
+   * Normalize extracted paths to workspace-relative format
    */
-  private parseJSON<T>(text: string): T | null {
-    try {
-      let cleaned = text.trim();
-      
-      // Remove markdown code blocks
-      cleaned = cleaned.replace(/^```json\s*/i, '');
-      cleaned = cleaned.replace(/^```\s*/, '');
-      cleaned = cleaned.replace(/\s*```$/, '');
-      
-      // Find JSON object
-      const jsonStart = cleaned.indexOf('{');
-      const jsonEnd = cleaned.lastIndexOf('}');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-      }
+  private normalizeExtractedPath(rawPath: string, workspaceRoot: string): string | null {
+    const withoutParens = rawPath.replace(/[()]/g, '').trim();
+    const normalized = withoutParens.replace(/\\/g, '/');
 
-      return JSON.parse(cleaned) as T;
-    } catch (error) {
-      console.error('JSON parse error:', error);
+    if (normalized.includes('node_modules/') || normalized.startsWith('file://')) {
       return null;
     }
+
+    const workspaceNormalized = workspaceRoot.replace(/\\/g, '/');
+    if (normalized.startsWith(workspaceNormalized + '/')) {
+      return path.posix.normalize(normalized.slice(workspaceNormalized.length + 1));
+    }
+
+    return path.posix.normalize(normalized);
+  }
+
+  /**
+   * Validate tester fix output structure
+   */
+  private isValidTestFix(fix: any): fix is TestFix {
+    return (
+      typeof fix === 'object' &&
+      typeof fix.analysis === 'string' &&
+      Array.isArray(fix.patches) &&
+      fix.patches.every((patch: Patch) =>
+        patch && typeof patch.path === 'string' && typeof patch.diff === 'string'
+      )
+    );
   }
 }

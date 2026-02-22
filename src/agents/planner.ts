@@ -6,6 +6,7 @@ import { OllamaClient } from '../ollama/client';
 import { PlannerOutput, OllamaMessage } from '../protocol/types';
 import { PLANNER_SYSTEM_PROMPT, buildPlannerPrompt } from '../protocol/prompts';
 import { WorkspaceTool } from '../tools/workspace';
+import { parseJsonObject } from './jsonParser';
 
 export class PlannerAgent {
   private ollama: OllamaClient;
@@ -46,7 +47,7 @@ export class PlannerAgent {
       });
 
       // Parse JSON response (with retry logic)
-      let plan = this.parseJSON<PlannerOutput>(response);
+      let plan = parseJsonObject<PlannerOutput>(response);
       
       if (!plan) {
         onProgress?.('Retrying JSON parsing...');
@@ -59,7 +60,7 @@ export class PlannerAgent {
         });
 
         response = await this.ollama.chat(messages);
-        plan = this.parseJSON<PlannerOutput>(response);
+        plan = parseJsonObject<PlannerOutput>(response);
       }
 
       if (!plan) {
@@ -78,35 +79,6 @@ export class PlannerAgent {
       throw new Error(`Planning failed: ${error}`);
     }
   }
-
-  /**
-   * Parse JSON from response, handling markdown code blocks
-   */
-  private parseJSON<T>(text: string): T | null {
-    try {
-      // Remove markdown code blocks if present
-      let cleaned = text.trim();
-      
-      // Remove ```json and ``` markers
-      cleaned = cleaned.replace(/^```json\s*/i, '');
-      cleaned = cleaned.replace(/^```\s*/, '');
-      cleaned = cleaned.replace(/\s*```$/, '');
-      
-      // Find JSON object
-      const jsonStart = cleaned.indexOf('{');
-      const jsonEnd = cleaned.lastIndexOf('}');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-      }
-
-      return JSON.parse(cleaned) as T;
-    } catch (error) {
-      console.error('JSON parse error:', error);
-      return null;
-    }
-  }
-
   /**
    * Validate plan structure
    */
