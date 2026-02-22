@@ -87,10 +87,15 @@ jobs:
         run: npx vsce publish --packagePath "${{ steps.vsix.outputs.path }}" --pat "${VSCE_PAT}"
 
       - name: Publish to Open VSX (optional)
-        if: secrets.OVSX_PAT != ''
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx ovsx publish "${{ steps.vsix.outputs.path }}" -p "${OVSX_PAT}"
+        shell: bash
+        run: |
+          if [ -z "${OVSX_PAT}" ]; then
+            echo "OVSX_PAT is not set. Skipping Open VSX publish."
+            exit 0
+          fi
+          npx ovsx publish "${{ steps.vsix.outputs.path }}" -p "${OVSX_PAT}"
 
       - name: Create GitHub release and upload VSIX
         uses: softprops/action-gh-release@v2
